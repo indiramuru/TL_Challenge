@@ -1,0 +1,120 @@
+<!doctype html>
+<html  ng-app="project" >
+	<head>
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/angular.js/1.4.8/angular.min.js"></script>
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/angular.js/1.4.8/angular-resource.min.js"></script> 	
+		<style>
+			.container {
+				margin: 2rem;
+			}
+			* {
+				margin: 0;
+				padding: 0;
+			}
+			ul li {
+				padding: .5rem;
+				list-style-type: none;
+				font-weight: normal;
+			}
+			input, div.drop-down-result {
+				width: 15rem;
+				padding-left:.5rem;
+			}
+			input {
+				height: 2rem;			
+			}
+			div.drop-down-result {
+				border: .1rem solid #cccccc;
+			}
+			div.drop-down-result > div {
+				border: none;
+				padding-left: 0;
+			}
+			h4.type {
+				text-transform: capitalize;
+			}
+		</style>
+	</head>
+	<body ng-controller="project">
+		<div class="container">
+			<input type="text" id="search" entity-type="eType" ng-model="searchText" autocomplete="off" placeholder="Search" search-result/>
+		</div>
+		
+		<script>
+			//Defining app module
+			var app = angular.module('project',[]);
+			
+			//Main controller for the body
+			app.controller("project", ['$scope', function($scope) {
+				$scope.searchText = '';
+				$scope.eType = ['actor','director']; //searching 'actor' and 'director'; should work for other combination as well;			
+			}]);
+			
+			//Directive to show the search result in a drop down
+			app.directive('searchResult', function($timeout){
+				return {
+					restrict: 'A',
+					scope: {				
+						entity: '=entityType'				
+					},
+					controller: ['$scope', '$http', function(scope, $http) {
+						var that = this;
+						that.isObjectExist = 0;
+						that.entityType = scope.ctrl.entity;
+						that.searchList = function(text){					
+							that.finalList = {};										
+							if(text) {						
+								angular.forEach(that.entityType, function(type, key){
+									app.factory(type, dataFactory);    //creating factory for each entity type
+									var dataFactory = (function() {	   //service to fetch data from API(in this case data is mocked)
+										$http.get('data.json').then(function(data){	
+											var typeResult = [];
+											angular.forEach(data.data, function(value){
+												var currentTypeValue = value[type];																		
+												if( currentTypeValue.toLowerCase().indexOf(text) > -1)
+													typeResult.push(currentTypeValue);										
+											});
+											if(typeResult.length)
+												that.finalList[type] = typeResult;   //do not show an empty entity in the drop down
+											if(key === that.entityType.length-1) {
+												that.isObjectExist = Object.keys(that.finalList).length;										
+												scope.appendTemplate(that.isObjectExist);
+											}
+										});														    							
+									})();						    					    
+								});						
+							}
+							else {
+								that.finalList = {};								
+							}									
+						};
+					}],
+					controllerAs: 'ctrl',
+					bindToController: true,
+					template: '<div><div ng-repeat="(key,val) in ctrl.finalList"><h4 class="type">{{key}}</h4><ul><li ng-repeat="i in val">{{i}}</li></ul></div></div>',																										
+					link: function(scope, iElement, iAttrs, controller) {
+						var timer;				
+						iElement.bind('input',function(){
+							if (timer) $timeout.cancel(timer);
+							timer = $timeout(function() {						
+								controller.searchList(iElement.val());
+								scope.$apply();
+							}, 500); // delay 500 ms
+						});
+						
+						//append template after the input element
+						scope.appendTemplate = function(isNotEmpty) {	
+							if(isNotEmpty) {	//draw borders around the drop down
+								iElement.find('div').addClass('drop-down-result');
+								iElement.parent().append(iElement.find('div'));
+							}
+							else {	//remove border when there is nothing to display in the drop down						
+								iElement.next().removeClass('drop-down-result');
+							}
+						}				
+					}
+				};
+			});	
+		</script>
+	</body>
+</html>
